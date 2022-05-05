@@ -1,9 +1,13 @@
 
+from http import client
 from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
-
+from django.urls import reverse
 from polls.models import Question
+from django.test import Client
+from datetime import timedelta
+
 # Create your tests here.
 
 class QuestionModelTests(TestCase):
@@ -25,3 +29,28 @@ class QuestionModelTests(TestCase):
         time = timezone.now() - timedelta(hours=23)
         recent_question = Question(pub_date=time)
         self.assertIs(recent_question.was_published_recently(), True)
+
+
+def create_question(question_text, days):
+    time = timezone.now() + timedelta(days=days)
+    return Question.objects.create(question_text=question_text, pub_date=time)
+class QuestionIndexViewTests(TestCase):
+    client = Client()
+    def test_no_questions(self):
+        response = self.client.get(reverse('polls:index'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No polls are available")
+        self.assertQuerysetEqual(response.context['latest_question_list'], [])
+
+    def test_past_question(self):
+        question = create_question("Past Question", -30)
+        response = self.client.get(reverse("polls:index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertQuerysetEqual(response.context["latest_question_list"], [question])
+    
+    def test_future_question(self):
+        create_question("Future Question", 30)
+        response = self.client.get(reverse("polls:index"))
+        self.assertContains(response, "No polls are available")
+        self.assertQuerysetEqual(response.context["latest_question_list"], [])
+        
